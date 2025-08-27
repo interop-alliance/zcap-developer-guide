@@ -177,6 +177,38 @@ the equivalent of invoking a capability.
 
 ### Creating and Delegating zCaps
 
+Creating a root zcap is easy:
+
+1. Choose a URL for which this zcap is intended. This will determine both
+   the `invocationTarget` and the zcap's `id`
+2. Construct the `id` like so: `urn:zcap:root:${encodeURIComponent(url)}`
+3. Choose the controller DID
+4. Put it all together using the root zcap template (see below)
+
+Javascript example of how to construct a root zcap, provided you know the URL
+that it's intended for, and the DID of the controller:
+
+```js
+const ROOT_ZCAP_TEMPLATE = {
+  '@context': [
+    'https://w3id.org/zcap/v1',
+    'https://w3id.org/security/suites/ed25519-2020/v1'
+  ],
+  id: 'urn:zcap:root:...',
+  controller: 'did:...',
+  invocationTarget: 'https://example.com/api/endpoint'
+};
+
+const url = 'https://example.com/api/endpoint';
+const did = 'did:key:z6MknBxrctS4KsfiBsEaXsfnrnfNYTvDjVpLYYUAN6PX2EfG';
+const rootCapability = {
+  ...ROOT_ZCAP_TEMPLATE,
+  id: `urn:zcap:root:${encodeURIComponent(url)}`,
+  controller: did,
+  invocationTarget: url
+};
+```
+
 Example root zcap:
 
 ```json
