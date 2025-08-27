@@ -10,6 +10,8 @@ Report issues to this guide's repo: https://github.com/interop-alliance/zcap-dev
 
 * [Motivation](#motivation)
 * [Introduction](#introduction)
+  - [When to Use zCaps (and When Not To)](#when-to-use-zcaps-and-when-not-to)
+  - [Limitations and Future Work](#limitations-and-future-work)
 * [Terminology](#terminology)
 * [zCap Lifecycle](#zcap-lifecycle)
   - [Creating and Delegating zCaps](#creating-and-delegating-zcaps)
@@ -19,6 +21,9 @@ Report issues to this guide's repo: https://github.com/interop-alliance/zcap-dev
 * [Verifying zCaps on the Resource Server](#verifying-zcaps-on-the-resource-server)
 * [Performance Considerations](#performance-considerations)
   - [Caching zCaps by `id` for Verification](#caching-zcaps-by-id-for-verification)
+* [Case Studies](#case-studies)
+  - [Using zCaps with Encrypted Data Vaults (EDVs)](#using-zcaps-with-encrypted-data-vaults-edvs)
+  - [Using zCaps with Wallet Attached Storage (WAS)](#using-zcaps-with-wallet-attached-storage-was)
 * [Appendix A: IANA Registration Considerations](#appendix-a-iana-registration-considerations)
 * [Appendix B: Implementations](#appendix-b-implementations)
 * [Appendix C: FAQ](#appendix-c-faq)
@@ -56,8 +61,8 @@ What do we mean by "structured access tokens"? Basically, they're JSON objects
 with the following properties, which roughly answer the question of "who can
 perform what actions with a given resource, given these restrictions":
 
-* **who** - which [agent](#agent) (identified by a cryptographic key) is being
-  given permission
+* **who** - which [agent](#agent) (identified by a cryptographic key or
+  [DID](#did-decentralized-identifier)) is being given permission
 * **can** - what actions is the agent allowed to perform
 * **with** - what *resource* are they allowed to perform the actions on
 * **given** - what other restrictions are in place? (these are also known as
@@ -101,6 +106,14 @@ does), so that even if the API requests were intercepted by a third party, the
 zcaps could not be reused/replayed (as long as the original app did not leak its
 private keys).
 
+### When to Use zCaps (and When Not To)
+
+### Limitations and Future Work
+
+* Currently, a zCap is limited to one invocationTarget.
+  * Needs to be: multiple invocationTarget-action combinations
+* No caveat notation currently used (or rather, implicit attenuation via URL suffixes)
+
 ## Terminology
 
 #### action, allowed action
@@ -120,6 +133,7 @@ prove cryptographic control over its identifier.
 #### capability chain
 
 #### caveat
+See [attenuation](#attenuation).
 
 #### controller
 
@@ -144,8 +158,6 @@ Analogy: a government servant may possess a badge of office in their pocket,
 but specifically the act of _presenting_ the badge to some other person (and
 thus proving possession of the badge, even if not cryptographicaly) would be
 the equivalent of invoking a capability.
-
-#### invoker
 
 #### key, cryptographic key
 
@@ -228,7 +240,8 @@ controller or similar appropriate entity.)
 
 ## Using zCaps with HTTP Requests
 
-To create an authorized HTTP request by invoking a given zcap:
+To create an authorized HTTP request by [invoking](#invocation-capability-invocation)
+a given zcap, follow this general algorithm:
 
 1. Construct the `Capability-Invocation` header
 2. Construct the `Digest` header if applicable (only if your request has a
@@ -273,6 +286,10 @@ const encodedCapability = base64UrlEncode(gzip(JSON.stringify(capability)))
 headers['capability-invocation'] = `zcap capability="${encodedCapability}",action="GET"`
 ```
 
+#### JS Example - `Capability-Invocation` Header
+
+
+
 ### Constructing the `Digest` Header
 
 * Only relevant/recommended if your request has a payload or request body
@@ -299,6 +316,8 @@ Digest: mh=uEiBfjwT2o6iSqqu922zyc4lEk3c5YNSjJbEF_uRu70ME8Q
 
 * Current deployments still use the [Cavage HTTP Signatures Draft 12](https://datatracker.ietf.org/doc/html/draft-cavage-http-signatures-12)
   spec
+
+### Constructing the `Authorization` Header
 
 Example `Authorization` header:
 
