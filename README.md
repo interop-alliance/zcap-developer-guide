@@ -8,21 +8,25 @@ Report issues to this guide's repo: https://github.com/interop-alliance/zcap-dev
 
 ## Table of Contents
 
+* [Motivation](#motivation)
 * [Introduction](#introduction)
-  - [Core Concept](#core-concept)
-  - [Why not OAuth 2](#why-not-oauth-2)
-  - [What About JSON-LD / Linked Data?](#what-about-json-ld--linked-data)
 * [Terminology](#terminology)
-* [Creating and Delegating zCaps](#creating-and-delegating-zcaps)
+* [zCap Lifecycle](#zcap-lifecycle)
+  - [Creating and Delegating zCaps](#creating-and-delegating-zcaps)
+  - [Requesting zCaps](#requesting-zcaps)
+  - [Revoking zCaps](#revoking-zcaps)
 * [Using zCaps with HTTP Requests](#using-zcaps-with-http-requests)
 * [Verifying zCaps on the Resource Server](#verifying-zcaps-on-the-resource-server)
 * [Performance Considerations](#performance-considerations)
   - [Caching zCaps by `id` for Verification](#caching-zcaps-by-id-for-verification)
 * [Appendix A: IANA Registration Considerations](#appendix-a-iana-registration-considerations)
 * [Appendix B: Implementations](#appendix-b-implementations)
+* [Appendix C: FAQ](#appendix-c-faq)
+  - [Why not OAuth 2](#why-not-oauth-2)
+  - [What About JSON-LD / Linked Data?](#what-about-json-ld--linked-data)
 * [License](#license)
 
-## Introduction
+## Motivation
 
 Currently, Authorization Capabilities (zCaps for short) are in an awkward but
 familiar situation where the deployed state of the art is significantly ahead
@@ -31,7 +35,7 @@ of the [specification](https://w3c-ccg.github.io/zcap-spec/).
 This implementation guide is meant to fill the gap between the spec and its usage
 in production.
 
-### Core Concept
+## Introduction
 
 What are Authorization Capabilities? (Aside from a less confusing name for
 [object capabilities](https://en.wikipedia.org/wiki/Object-capability_model).)
@@ -97,26 +101,6 @@ does), so that even if the API requests were intercepted by a third party, the
 zcaps could not be reused/replayed (as long as the original app did not leak its
 private keys).
 
-### Why Not OAuth 2
-
-Developers familiar with common API authorization schemes might well ask, "how
-is this better than OAuth 2?".
-
-...
-
-### What About JSON-LD / Linked Data?
-
-* The current spec version, [Authorization Capabilities for Linked Data v0.3](https://w3c-ccg.github.io/zcap-spec/),
-  uses JSON-LD serializations for zCaps, primarily for the convenience of
-  using various Data Integrity cryptosuites for proof chains.
-* However, now that the W3C Verifiable Credentials Working Group has released
-  specs that don't require linked data canonicalization (such as the
-  [`eddsa-jcs-2022`](https://w3c.github.io/vc-di-eddsa/#eddsa-jcs-2022) suite),
-  proof chains can be done without the use of `@context` or JSON-LD.
-* (From conversations with the zCap spec editors) The next version of the zCap
-  spec is going to drop the `@context` requirement, and use either JCS-based
-  signature methods, or perhaps specify a _default context_.
-
 ## Terminology
 
 #### action, allowed action
@@ -126,6 +110,8 @@ Any entity, usually an app (mobile, desktop or web app), an AI agent,
 or cloud microservice, capable of generating or storing cryptographic material
 (at least a public/private [keypair](#key-cryptographic-key)) so that it can
 prove cryptographic control over its identifier.
+
+#### allowed actions
 
 #### attenuation
 
@@ -175,7 +161,9 @@ the equivalent of invoking a capability.
 
 #### zcap
 
-## Creating and Delegating zCaps
+## zCap Lifecycle
+
+### Creating and Delegating zCaps
 
 Example root zcap:
 
@@ -216,7 +204,107 @@ Example delegated zcap:
 }
 ```
 
+### Requesting zCaps
+
+How does an agent request a zCap? (From the [resource server](#resource-server-rs)'s
+controller or similar appropriate entity.)
+
+* For many use cases, zCaps do not need to be dynamically requested. Instead,
+  they are created/delegated at service provisioning time, and the resulting
+  zCap in a config file (environment variable or your secrets management
+  infrastructure)
+* For user-facing workflows, consider using VC-API in combination with the
+  [Authorization Capability Request](https://w3c-ccg.github.io/vp-request-spec/#authorization-capability-request)
+  query from the VPR spec. 
+* Other workflows and protocols, such as the [Grant Negotiation and Authorization
+  Protocol (GNAP)](https://datatracker.ietf.org/doc/rfc9635/) can also be used
+  to request zCaps.
+
+### Revoking zCaps
+
+* Out of band
+* [Resource Server](#resource-server-rs) is responsible for handling its own
+  revocation API / logic
+
 ## Using zCaps with HTTP Requests
+
+To create an authorized HTTP request by invoking a given zcap:
+
+1. Construct the `Capability-Invocation` header
+2. Construct the `Digest` header if applicable (only if your request has a
+   body/payload -- applicable for PUT/POST but not for GET)
+3. Assemble the pseudo-headers and headers to sign:
+   `['(key-id)', '(created)', '(expires)', '(request-target)','host', 'capability-invocation']`
+    * If request has a body, add `'content-type', 'digest'` headers to the above list
+4. Create the signature string (see below for details)
+5. Construct the `Authorization` header, add the signature and other relevant parameters
+6. Perform the HTTP request, include the `Capability-Invocation`, `Authorization`,
+   and (optionally, if request has a body) the `Digest` headers
+
+### Current vs Future Deployments
+
+* Current zCap deployments and implementation libraries use the `Digest` header
+  from the [`draft-ietf-httpbis-digest-headers-05`](https://www.ietf.org/archive/id/draft-ietf-httpbis-digest-headers-05.html)
+  draft spec, and use the `Authorization` header from the
+  [Cavage HTTP Signatures Draft 12](https://datatracker.ietf.org/doc/html/draft-cavage-http-signatures-12)
+  spec
+* Future iterations of the zCap spec and implementations are expected to migrate
+  to use [RFC 9421: HTTP Message Signatures](https://datatracker.ietf.org/doc/html/rfc9421)
+  and its corresponding `Signature-Input`, `Signature`, and `Content-Digest`
+  headers instead.
+
+### The `Capability-Invocation` Header
+
+For root zcap invocations, use the zcap id by itself:
+
+```
+Capability-Invocation: zcap id="urn:zcap:root:https%3A%2F%2Fexample.com%2Fapi"
+```
+
+For delegated (non-root) zcaps, include the full encoded gzip'd capability, as
+well as the action being invoked.
+
+Example using JS string templates to construct the header for performing a `GET`
+action:
+
+```js
+const encodedCapability = base64UrlEncode(gzip(JSON.stringify(capability)))
+
+headers['capability-invocation'] = `zcap capability="${encodedCapability}",action="GET"`
+```
+
+### Constructing the `Digest` Header
+
+* Only relevant/recommended if your request has a payload or request body
+  (that is, if it's a PUT or POST request, etc)
+* See the [`draft-ietf-httpbis-digest-headers-05`](https://www.ietf.org/archive/id/draft-ietf-httpbis-digest-headers-05.html)
+  draft spec for details
+* Current deployments use either:
+  - the `SHA-256` hash method with base64url encoding, or
+  - Multihash encoding (also using `sha256`)
+
+Example base64url encoded `Digest` header:
+
+```
+Digest: SHA-256=X48E9qOokqqrvdts8nOJRJN3OWDUoyWxBf7kbu9DBPE=
+```
+
+Example Multihash encoded `Digest` header:
+
+```
+Digest: mh=uEiBfjwT2o6iSqqu922zyc4lEk3c5YNSjJbEF_uRu70ME8Q
+```
+
+### Constructing the HTTP Message Signature
+
+* Current deployments still use the [Cavage HTTP Signatures Draft 12](https://datatracker.ietf.org/doc/html/draft-cavage-http-signatures-12)
+  spec
+
+Example `Authorization` header:
+
+```
+Authorization: Signature keyId="...",algorithm="rsa-sha256",headers="...",created="...",expires="...",signature="..."
+```
 
 ## Verifying zCaps on the Resource Server
 
@@ -226,9 +314,36 @@ Example delegated zcap:
 
 ## Case Studies
 
+### Using zCaps with Encrypted Data Vaults (EDVs)
+
+### Using zCaps with Wallet Attached Storage (WAS)
+
 ## Appendix A: IANA Registration Considerations
 
 ## Appendix B: Implementations
+
+## Appendix C: FAQ
+
+### Why Not OAuth 2
+
+Developers familiar with common API authorization schemes might well ask, "how
+is this better than OAuth 2?".
+
+...
+
+### What About JSON-LD / Linked Data?
+
+* The current spec version, [Authorization Capabilities for Linked Data v0.3](https://w3c-ccg.github.io/zcap-spec/),
+  uses JSON-LD serializations for zCaps, primarily for the convenience of
+  using various Data Integrity cryptosuites for proof chains.
+* However, now that the W3C Verifiable Credentials Working Group has released
+  specs that don't require linked data canonicalization (such as the
+  [`eddsa-jcs-2022`](https://w3c.github.io/vc-di-eddsa/#eddsa-jcs-2022) suite),
+  proof chains can be done without the use of `@context` or JSON-LD.
+* (From conversations with the zCap spec editors) The next version of the zCap
+  spec is going to drop the `@context` requirement, and use either JCS-based
+  signature methods, or perhaps specify a _default context_.
+
 
 ## License
 This work is licensed under a
