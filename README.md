@@ -169,13 +169,29 @@ the equivalent of invoking a capability.
 
 #### root zcap
 
+#### signer
+
 #### target, invocation target
 
 #### zcap
 
+Short for 'Authori**z**ation **Cap**ability'. Used generally to refer to a specific
+capability constructed according to the [Authorization Capabilities for Linked
+Data v0.3](https://w3c-ccg.github.io/zcap-spec/) specification. Sometimes used
+as a general term for a stuctured access token with proof of control and the
+ability to do delegation chain proofs.
+
+For Object Capability enthusiasts: zCaps are an example of a _certificate-based_
+capability, as opposed to _platform capabilities_ such as those used by the
+[OCapN](https://ocapn.org/) protocol. Don't worry, though, 'certificate-based'
+just means that it uses a digital signature, you won't actually have to wrangle
+x509 certificates.
+
 ## zCap Lifecycle
 
 ### Creating and Delegating zCaps
+
+#### Creating a root zCap
 
 Creating a root zcap is easy:
 
@@ -192,6 +208,7 @@ that it's intended for, and the DID of the controller:
 const ROOT_ZCAP_TEMPLATE = {
   '@context': [
     'https://w3id.org/zcap/v1',
+    // Assumes you're using an ed25519 based DID; substitute as appropriate
     'https://w3id.org/security/suites/ed25519-2020/v1'
   ],
   id: 'urn:zcap:root:...',
@@ -220,6 +237,32 @@ Example root zcap:
   "controller": "did:key:z6Mkfeco2NSEPeFV3DkjNSabaCza1EoS3CmqLb1eJ5BriiaR",
   "invocationTarget": "https://example.com/api"
 }
+```
+
+#### Delegating a zCap
+
+```js
+import { ZcapClient } from '@digitalbazaar/ezcap';
+import { Ed25519Signature2020 } from '@digitalbazaar/ed25519-signature-2020';
+import { ZcapClient } from '@digitalbazaar/ezcap';
+
+const zcapClient = new ZcapClient({
+  delegationSigner: capabilityDelegationKey.signer(),
+  SuiteClass: Ed25519Signature2020
+});
+
+const allowedActions = ['GET']
+// DID identifying the entity to delegate to.
+const delegatee = 'did:key:...';
+
+const url = 'https://example.com/api/endpoint';
+
+// Pass in the zcap to delegate - either the original root zcap or its descendant
+const capability = rootZcap;
+
+const delegatedCapability = await zcapClient.delegate({
+  url, capability, targetDelegate: delegatee, allowedActions
+});
 ```
 
 Example delegated zcap:
