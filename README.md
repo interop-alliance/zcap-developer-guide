@@ -307,6 +307,32 @@ controller or similar appropriate entity.)
   Protocol (GNAP)](https://datatracker.ietf.org/doc/rfc9635/) can also be used
   to request zCaps.
 
+Example zCap request:
+
+```json
+{
+    "verifiablePresentationRequest": {
+      "interact": {
+        "type": "UnmediatedHttpPresentationService2021",
+        "serviceEndpoint": "https://example.com/exchanges/tx/12345"
+      },
+      "query": [
+        {
+          "type": "ZcapQuery",
+          "capabilityQuery": {
+            "reason":
+              "Example App is requesting the permission to read and write to the Verifiable Credentials and VC Evidence collections.",
+            "allowedAction": ["GET", "PUT", "POST"],
+            "controller": "did:example:12345",
+            "invocationTarget": 
+              { "type": "urn:was:collection", "contentType": "application/vc", "name": "VerifiableCredential collection"}
+          }
+        }
+      ]
+    }
+}
+```
+
 ### Revoking zCaps
 
 * Out of band
