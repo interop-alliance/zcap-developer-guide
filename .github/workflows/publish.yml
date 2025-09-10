@@ -3,6 +3,7 @@ name: Upload to Wallet Attached Storage (WASUP)
 on:
   push:
     branches:
+      - 11ty
       - main
   pull_request:
   workflow_dispatch:
