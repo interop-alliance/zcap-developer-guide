@@ -1,0 +1,19 @@
+#!/bin/bash
+set -e # stop on error
+# set -x
+WAS="${WAS:-https://storage.bengo.is}"
+SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
+SPACE_UUID="${SPACE_UUID:-$(cat "$SCRIPT_DIR/../default-space/uuid")}"
+SPACE="$WAS/space/$SPACE_UUID"
+ID="${ID:-$HOME/.ssh/wasup-react-router-default}"
+CONTROLLER="$(npx wasupdoc --controller "$ID" | jq -r .controller)"
+
+space="$(./scripts/space.json.ts ${CONTROLLER+"--controller=$CONTROLLER"} ${SPACE_UUID+"--uuid=$SPACE_UUID"} )"
+echo "$space"
+wasup -i "$ID" --content-type application/json /dev/stdin "$SPACE"  <<< "$space"
+
+linkset="$(./scripts/linkset.json.ts --uuid "$SPACE_UUID")"
+wasup -i "$ID" --content-type application/linkset+json /dev/stdin "$SPACE"/linkset.json <<< "$linkset"
+
+acl="$(./scripts/acl.json.ts)"
+wasup -i "$ID" --content-type application/json /dev/stdin "$SPACE"/acl.json <<< "$acl"
