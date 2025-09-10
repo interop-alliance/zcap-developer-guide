@@ -1,0 +1,195 @@
+name: Upload to Wallet Attached Storage (WASUP)
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: GitHub Environment to use
+        required: false
+      space:
+        description: URL of Data Space
+        required: false
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    name: Publish to WAS
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment}}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Print branch name
+        run: |
+          echo "Current branch: ${GITHUB_REF##*/}"
+
+      - name: Get Repository URL and Branch Name
+        run: |
+          echo "Repository URL: https://github.com/${{ github.repository }}"
+
+          if [[ ${{ github.event_name }} == 'pull_request' ]]; then
+            echo "Source Branch: ${{ github.head_ref }}"
+          else
+            echo "Branch Name: ${GITHUB_REF##*/}"
+          fi
+
+      - if: ${{ github.event_name == 'pull_request' }}
+        name: Get PR Source Branch URL
+        id: getGitHubPrSourceUrl
+        run: |
+          echo "GITHUB_PR_SOURCE_URL=https://github.com/${{ github.repository }}/tree/${{ github.head_ref }}" >> $GITHUB_OUTPUT
+      - if: ${{ github.event_name != 'pull_request' }}
+        name: Get Current Branch URL
+        id: getGitHubBranchUrl
+        run: |
+          echo "GITHUB_REF_BRANCH_URL=https://github.com/${{ github.repository }}/tree/${GITHUB_REF##*/}" >> $GITHUB_OUTPUT
+
+      - id: echoGitHubUrl
+        run: |
+          echo "GITHUB_BRANCH_URL=${{ steps.getGitHubPrSourceUrl.outputs.GITHUB_PR_SOURCE_URL || steps.getGitHubBranchUrl.outputs.GITHUB_REF_BRANCH_URL }}" >> $GITHUB_OUTPUT
+
+      - run: echo "GITHUB_BRANCH_URL=${{ steps.echoGitHubUrl.outputs.GITHUB_BRANCH_URL }}" >> $GITHUB_ENV
+      - run: echo "GITHUB_BRANCH_URL=$GITHUB_BRANCH_URL"
+
+      # Ok now we can finally build a URL to the branch on GitHub,
+      # which should be based on the PR Source, if there is one,
+      # otherwise the current branch.
+      - if: ${{ steps.echoGitHubUrl.outputs }}
+        run: echo "SPACE_SUBJECT=${{ steps.echoGitHubUrl.outputs.GITHUB_BRANCH_URL }}" >> $GITHUB_ENV
+
+      - run: echo "SPACE_SUBJECT=$SPACE_SUBJECT"
+      - id: echoSpaceSubjectCuuid
+        run: |
+          RFC962_NSID_URL='6ba7b811-9dad-11d1-80b4-00c04fd430c8'
+          echo -n "$SPACE_SUBJECT" | npx -y cuuid-sha-256 --namespace "$RFC962_NSID_URL"
+          echo "SPACE_SUBJECT_CUUID=$(echo -n "$SPACE_SUBJECT" | npx -y cuuid-sha-256 --namespace "$RFC962_NSID_URL")" >> $GITHUB_OUTPUT
+
+      - run: echo "SPACE_SUBJECT_CUUID=${{ steps.echoSpaceSubjectCuuid.outputs.SPACE_SUBJECT_CUUID }}" >> $GITHUB_ENV
+      - run: echo "SPACE_SUBJECT_CUUID=$SPACE_SUBJECT_CUUID"
+
+      - id: echoSpaceUrl
+        env:
+          SPACE_UUID: "${{ steps.echoSpaceSubjectCuuid.outputs.SPACE_SUBJECT_CUUID }}"
+        run: |
+          echo "spaceUrl=https://storage.bengo.is/space/$SPACE_UUID" >> "$GITHUB_OUTPUT"
+
+      # Set up node.js
+      - name: Setup Node.js
+        if: ${{ hashFiles('package.json') != '' }}
+        id: setup-node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install Dependencies
+        id: npm-ci
+        run: npm ci
+        # npm prepare scripts will run builds, so build-time envs go here
+        # env:
+        #   BASE_URL: "/space/${{ steps.readDefaultSpaceUuid.outputs.content }}/"
+
+
+      # - name: 'Setup jq'
+      #   uses: dcarbone/install-jq-action@v3
+      - run: echo "char count of WASUP_ID is $(echo "$WASUP_ID" | wc -c)"
+        env:
+          WASUP_ID: "${{ secrets.WASUP_ID }}"     
+      - run: npx wasupdoc --help
+      - run: echo "$WASUP_ID" | npx wasupdoc --controller /dev/stdin
+        env:
+          WASUP_ID: "${{ secrets.WASUP_ID }}"
+
+      - run: ./scripts/ci-space.json.sh
+        env:
+          WASUP_ID: "${{ secrets.WASUP_ID }}"
+          WASUP_REACT_SPACE_UUID: "${{ steps.echoSpaceSubjectCuuid.outputs.SPACE_SUBJECT_CUUID }}"
+
+      - run: |
+          SPACE_JSON="$(./scripts/ci-space.json.sh)"
+          echo "SPACE_JSON<<EOF" >> $GITHUB_OUTPUT
+          echo "$SPACE_JSON" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+        env:
+          WASUP_ID: "${{ secrets.WASUP_ID }}"
+          WASUP_REACT_SPACE_UUID: "${{ steps.echoSpaceSubjectCuuid.outputs.SPACE_SUBJECT_CUUID }}"
+        id: echoSpaceJson
+
+      - run: |
+          echo SPACE_JSON:
+          echo "${{ steps.echoSpaceJson.outputs.SPACE_JSON }}"
+
+      - run: echo SPACE_JSON=$SPACE_JSON
+        env:
+          SPACE_JSON: "${{ steps.echoSpaceJson.outputs.SPACE_JSON }}"
+
+      - run: npm i -g https://github.com/gobengo/wasup
+      - run: |
+          WASUP_ID_FILE="$RUNNER_TEMP"/WASUP_ID
+          trap 'rm -f $WASUP_ID_FILE' EXIT
+          echo "$WASUP_ID" > "$WASUP_ID_FILE"
+          echo "$SPACE_JSON" | wasup /dev/stdin "$SPACE_URL" --identity "$WASUP_ID_FILE" -v
+          wasup README.md "$SPACE_URL"/README.md --identity "$WASUP_ID_FILE" -v
+
+          # add linkset.json
+          echo "creating linkset with uuid $WASUP_REACT_SPACE_UUID"
+          LINKSET_JSON="$(./scripts/linkset.json.ts --uuid "$WASUP_REACT_SPACE_UUID")"
+          LINKSET_JSON_FILE="$RUNNER_TEMP"/LINKSET_JSON
+          LINKSET_JSON_URL="$SPACE_URL/linkset.json"
+          echo "$LINKSET_JSON" > "$LINKSET_JSON_FILE"
+          wasup --content-type application/linkset+json "$LINKSET_JSON_FILE" "$LINKSET_JSON_URL" --identity "$WASUP_ID_FILE" -v
+          echo "wrote $LINKSET_JSON_URL"
+
+          # add acl.json
+          echo "creating acl with uuid $WASUP_REACT_SPACE_UUID"
+          ACL_JSON="$(./scripts/acl.json.ts)"
+          ACL_JSON_FILE="$RUNNER_TEMP"/ACL_JSON
+          ACL_JSON_URL="$SPACE_URL/acl.json"
+          echo "$ACL_JSON" > "$ACL_JSON_FILE"
+          wasup --content-type application/json "$ACL_JSON_FILE" "$ACL_JSON_URL" --identity "$WASUP_ID_FILE" -v
+          echo "wrote ACL_JSON_URL=$ACL_JSON_URL"
+        env:
+          SPACE_URL: "${{ steps.echoSpaceUrl.outputs.spaceUrl }}"
+          SPACE_JSON: "${{ steps.echoSpaceJson.outputs.SPACE_JSON }}"
+          WASUP_ID: "${{ secrets.WASUP_ID }}"
+          WASUP_REACT_SPACE_UUID: "${{ steps.echoSpaceSubjectCuuid.outputs.SPACE_SUBJECT_CUUID }}"
+
+      # We want the same html to be served in response to /, /foo/, /foo/bar/, etc.
+      # That html has script and link tags required to work.
+      # What href should they use? /space/$WASUP_REACT_SPACE_UUID/
+      # Assign that as BASE_URL and prepare the website,
+      # which will update ../../website/build/client/index.html to use the new BASE_URL
+      - name: re prepare website with BASE_URL="$WASUP_REACT_SPACE_UUID"
+        run: |
+          npm -w website run prepare
+        env:
+          BASE_URL: "/space/${{ steps.echoSpaceSubjectCuuid.outputs.SPACE_SUBJECT_CUUID }}/"
+
+      - name: Publish to WAS
+        id: test-action
+        uses:  gobengo/wallet-attached-storage-action@main
+        with:
+          space: "${{ steps.echoSpaceUrl.outputs.spaceUrl }}"
+          id: "${{ secrets.WASUP_ID }}"
+          # ACTIONS_STEP_DEBUG: "${{ inputs.ACTIONS_STEP_DEBUG }}"
+          files: "${{ inputs.files || './website/build/client/*' }}"
+          filesStripPrefix: "${{ inputs.filesStripPrefix || 'website/build/client/' }}"
+
+      - name: Print Space URL
+        id: output-space
+        run: echo "${{ steps.test-action.outputs.space }}"
+
+      - run: |
+          echo "# Publish Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## Space" >> $GITHUB_STEP_SUMMARY
+          echo "<${{ steps.test-action.outputs.space }}>" >> $GITHUB_STEP_SUMMARY
+          echo "### Space Home Page" >> $GITHUB_STEP_SUMMARY
+          echo "<${{ steps.test-action.outputs.space }}/>" >> $GITHUB_STEP_SUMMARY
