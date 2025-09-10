@@ -169,7 +169,7 @@ jobs:
       # which will update ../../website/build/client/index.html to use the new BASE_URL
       - name: re prepare website with BASE_URL="$WASUP_REACT_SPACE_UUID"
         run: |
-          npm -w website run prepare
+          npm run prepare
         env:
           BASE_URL: "/space/${{ steps.echoSpaceSubjectCuuid.outputs.SPACE_SUBJECT_CUUID }}/"
 
@@ -180,8 +180,8 @@ jobs:
           space: "${{ steps.echoSpaceUrl.outputs.spaceUrl }}"
           id: "${{ secrets.WASUP_ID }}"
           # ACTIONS_STEP_DEBUG: "${{ inputs.ACTIONS_STEP_DEBUG }}"
-          files: "${{ inputs.files || './website/build/client/*' }}"
-          filesStripPrefix: "${{ inputs.filesStripPrefix || 'website/build/client/' }}"
+          # files: "${{ inputs.files || './website/build/client/*' }}"
+          # filesStripPrefix: "${{ inputs.filesStripPrefix || 'website/build/client/' }}"
 
       - name: Print Space URL
         id: output-space
