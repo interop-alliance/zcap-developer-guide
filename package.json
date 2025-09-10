@@ -1,0 +1,20 @@
+{
+  "name": "zcap-developer-guide",
+  "version": "0.0.0",
+  "description": "[![CC BY-NC-SA 4.0][cc-by-nc-sa-shield]][cc-by-nc-sa]",
+  "homepage": "https://github.com/gobengo/zcap-developer-guide#readme",
+  "bugs": {
+    "url": "https://github.com/gobengo/zcap-developer-guide/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/gobengo/zcap-developer-guide.git"
+  },
+  "license": "UNLICENSED",
+  "author": "",
+  "type": "module",
+  "main": "README.md",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  }
+}
