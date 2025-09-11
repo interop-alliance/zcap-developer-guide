@@ -197,8 +197,19 @@ Note: The RS is ultimately responsible for verifying and enforcing zCaps.
 A way to revoke (make invalid) a given zcap, after it was issued.
 
 #### root zcap
+Using zCaps to make authorization-carrying HTTP requests is done in one of two
+modes: either using a [root capability](#root-zcap), or using a delegated
+capability.
+
+Root zcaps are used in cases where full "admin" access is appropriate.
+All other zcaps are delegated by the agent holding a root zcap. Delegation
+is expressed in the [proof chain](#capability-chain-proof-chain) section of a
+zcap.
+
+See [Creating a Root zCap](#creating-a-root-zcap)
 
 #### signer
+See [Creating a did:key Signer Instance](https://github.com/digitalcredentials/wallet-attached-storage#creating-a-didkey-signer-instance)
 
 #### target, invocation target
 
@@ -271,9 +282,8 @@ Example root zcap:
 #### Delegating a zCap
 
 ```js
-import { ZcapClient } from '@digitalbazaar/ezcap';
-import { Ed25519Signature2020 } from '@digitalbazaar/ed25519-signature-2020';
-import { ZcapClient } from '@digitalbazaar/ezcap';
+import { Ed25519Signature2020 } from '@digitalcredentials/ed25519-signature-2020';
+import { ZcapClient } from '@digitalcredentials/ezcap';
 
 const zcapClient = new ZcapClient({
   delegationSigner: capabilityDelegationKey.signer(),
@@ -369,6 +379,67 @@ Example zCap request:
   revocation API / logic
 
 ## Using zCaps with HTTP Requests
+
+### Code Examples
+
+Although this guide goes into the details (below) of how to construct an HTTP
+request using zCaps for authorization, developers are likely to interact with
+zCaps using some sort of REST client with a wrapper that constructs the
+necessary headers.
+
+Javascript example, using a [root capability](#root-zcap) to make requests.
+Note that to use a root zcap, the client needs to know just two things:
+
+1. Which cryptographic key type to use (that's the `Ed25519Signature2020` suite)
+2. A [signer](#signer), which is an abstract handle to a signature function.
+   Signers are either provisioned at config time (with a private key loaded from
+   an environment secret), or, preferably, used via an HSM (Hardware Security
+   Module).
+
+```js
+import { Ed25519Signature2020 } from '@digitalcredentials/ed25519-signature-2020'
+import { ZcapClient } from '@digitalcredentials/ezcap'
+
+const rootSigner = await loadOrConstructRootSigner()
+
+// Construct a client, pass it the ability to sign requests (via invocationSigner)
+const zcapClient = new ZcapClient({
+  SuiteClass: Ed25519Signature2020, invocationSigner: rootSigner
+})
+
+// You can now perform authorization-carrying requests
+const url = 'https://example.com/api/protected-endpoint'
+
+const response = await zcapClient.request({
+  url, method: 'GET', action: 'GET'
+})
+console.log(response)
+```
+
+When using a [delegated](#delegating-a-zcap) zcap, you will need to also include
+it in each request. Example:
+
+```js
+const capability = await loadDelegatedCapabilityFromConfig()
+const invocationSigner = await loadSignerFromConfig()
+const zcapClient = new ZcapClient({
+  SuiteClass: Ed25519Signature2020, invocationSigner
+})
+
+// You can also include additional custom headers
+const response = await zcapClient.request({
+  url, capability, headers,
+  method: 'POST', action: 'POST', json: { hello: "world" }
+})
+console.log(response)
+```
+
+### Constructing an HTTP Request Algorithm Overview
+
+Note: This section is mostly for the benefit of zCap library implementers.
+Developers wishing to use zCaps to make requests are encouraged to use existing
+libraries whenever possible, such as the `@digitalcredentials/ezcap` Javascript
+library.
 
 To create an authorized HTTP request by [invoking](#invocation-capability-invocation)
 a given zcap, follow this general algorithm:
