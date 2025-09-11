@@ -118,36 +118,58 @@ private keys).
 
 #### action, allowed action
 
+A list of operations that the holder of the zcap is allowed to perform on the
+[target](#target-invocation-target), provided they can provide an invocation
+signature.
+
 #### agent
 Any entity, usually an app (mobile, desktop or web app), an AI agent,
 or cloud microservice, capable of generating or storing cryptographic material
 (at least a public/private [keypair](#key-cryptographic-key)) so that it can
 prove cryptographic control over its identifier.
 
-#### allowed actions
-
 #### attenuation
 
 #### Authorization header
+An HTTP header typically used to carry request authorizations.
+See [Constructing the Authorization Header](#constructing-the-authorization-header).
 
-#### capability chain
+#### capability chain, proof chain
 
 #### caveat
 See [attenuation](#attenuation).
 
 #### controller
+The [DID](#did-decentralized-identifier) of the [agent](#agent) authorized to
+invoke a capability.
 
 #### data integrity proof
+A way to cryptographically sign a structured document (like a JSON object), used
+for chained delegation proofs.
+See the [Verifiable Credential Data Integrity 1.0](https://www.w3.org/TR/vc-data-integrity/)
+specification for more details.
 
 #### delegation
 
 #### Digest header
+An HTTP header containing a digest hash of the request body.
+See [Constructing the Digest Header](#constructing-the-digest-header).
 
 #### DID, Decentralized Identifier
+See [Decentralized Identifier 1.1](https://www.w3.org/TR/did-1.1/) spec
 
 #### expiration
+An optional zcap property with a timestamp determining when a zcap expires.
+The timestamp is a string, in [XML-Schema dateTimeStamp](https://www.w3.org/TR/xmlschema11-2/#dateTimeStamp)
+format (web developers may be familiar with this format from the Javascript
+[`toISOString()`](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Date/toISOString)
+function).
 
 #### HTTP Signatures
+Refers to [RFC9421: HTTP Message Signatures](https://www.rfc-editor.org/rfc/rfc9421.html),
+a specification that details how to sign HTTP requests (headers and body).
+However, see the [Current vs Future Deployments](#current-vs-future-deployments)
+section for more discussion.
 
 #### invocation, capability invocation
 The _act_ of invoking a capability at the intended destination ([resource 
@@ -160,12 +182,19 @@ thus proving possession of the badge, even if not cryptographicaly) would be
 the equivalent of invoking a capability.
 
 #### key, cryptographic key
-
-#### proof chain
+Used to sign capability invocations, HTTP headers, and to generate delegation
+proofs. For zCaps specifically, this is likely to be an asymmetric key pair,
+using an appropriate elliptic curve such as `ed25519`.
 
 #### resource server, RS
+A server hosting a resource that's protected by an authorization capability.
+For API use cases, it's the API server itself, for storage use cases, it's
+the actual file or database server hosting the individual objects specified in
+`invocationTarget`.
+Note: The RS is ultimately responsible for verifying and enforcing zCaps.
 
 #### revocation
+A way to revoke (make invalid) a given zcap, after it was issued.
 
 #### root zcap
 
