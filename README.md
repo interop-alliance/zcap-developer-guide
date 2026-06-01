@@ -482,6 +482,7 @@ Example using JS string templates to construct the header for performing a `GET`
 action:
 
 ```js
+// base64url encoding: RFC 4648 url-safe, UNPADDED
 const encodedCapability = base64UrlEncode(gzip(JSON.stringify(capability)))
 
 headers['capability-invocation'] = `zcap capability="${encodedCapability}",action="GET"`
@@ -525,6 +526,8 @@ Example `Authorization` header:
 ```
 Authorization: Signature keyId="...",algorithm="rsa-sha256",headers="...",created="...",expires="...",signature="..."
 ```
+
+The `signature` parameter is base64 encoded (RFC 4648, standard alphabet, PADDED).
 
 ## Verifying zCaps on the Resource Server
 
