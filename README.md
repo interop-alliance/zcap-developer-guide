@@ -19,6 +19,11 @@ Report issues to this guide's repo: https://github.com/interop-alliance/zcap-dev
   - [Revoking zCaps](#revoking-zcaps)
 * [Using zCaps with HTTP Requests](#using-zcaps-with-http-requests)
 * [Verifying zCaps on the Resource Server](#verifying-zcaps-on-the-resource-server)
+  - [Verification Algorithm Overview](#verification-algorithm-overview)
+  - [Where Does the Root zCap Come From?](#where-does-the-root-zcap-come-from)
+  - [JS Example - Verifying an Incoming Request](#js-example---verifying-an-incoming-request)
+  - [What the Verification Library Does *Not* Check](#what-the-verification-library-does-not-check)
+  - [Verifying the `Digest` Header](#verifying-the-digest-header)
 * [Performance Considerations](#performance-considerations)
   - [Caching zCaps by `id` for Verification](#caching-zcaps-by-id-for-verification)
 * [Case Studies](#case-studies)
@@ -580,6 +585,271 @@ Authorization: Signature keyId="...",algorithm="rsa-sha256",headers="...",create
 The `signature` parameter is base64 encoded (RFC 4648, standard alphabet, PADDED).
 
 ## Verifying zCaps on the Resource Server
+
+The [resource server](#resource-server-rs) is ultimately responsible for
+verifying and enforcing zCaps. As with making requests, developers are
+encouraged to use an existing library rather than implementing verification
+from scratch -- in Javascript, that's the `@interop/http-signature-zcap-verify`
+package (a fork of `@digitalbazaar/http-signature-zcap-verify`).
+
+Verifying an incoming request involves two separate cryptographic checks:
+
+1. **The HTTP signature** (from the `Authorization` header) -- proves that the
+   requester controls the key it claims, and that the request was not tampered
+   with in transit (this is the proof-of-possession part).
+2. **The capability chain** (from the `Capability-Invocation` header) -- proves
+   that the key used to sign the request was actually granted authority over
+   this target, by an unbroken chain of [delegations](#delegation) leading back
+   to the expected [root zcap](#root-zcap).
+
+### Verification Algorithm Overview
+
+Note: as with the request construction section, this is mostly for the benefit
+of zCap library implementers. The whole algorithm below is performed by a
+single call to `verifyCapabilityInvocation()` (see the code example in the next
+section).
+
+1. Parse the `Authorization` header (see [Current vs Future
+   Deployments](#current-vs-future-deployments)) and check that all the
+   expected pseudo-headers and headers were covered by the signature:
+   `['(key-id)', '(created)', '(expires)', '(request-target)', 'host',
+   'capability-invocation']`, plus `'content-type'` and `'digest'` if the
+   request has a body. Check the signature's `created` and `expires`
+   timestamps against the current time (allowing for some clock skew,
+   typically 300 seconds).
+2. Check that the `Host` header matches the server's own expected host.
+3. Dereference the signature's `keyId` (for example, resolve the `did:key` to
+   get the public key), reconstruct the signing string, and verify the
+   signature.
+4. Parse the `Capability-Invocation` header (the scheme must be `zcap`):
+   * If it contains an `id` parameter, the invoked capability is a [root
+     zcap](#root-zcap), referenced by its `urn:zcap:root:...` id.
+   * If it contains a `capability` parameter, base64url-decode and gunzip it
+     to get the full delegated zcap. A zcap passed by value _must_ have a
+     `parentCapability` (root zcaps may only be invoked by `id`).
+5. Validate the capability itself:
+   * Dereference the [capability chain](#capability-chain-proof-chain) back to
+     the root, and check that the root matches the *expected* root capability
+     id for this URL (which the server computes itself -- see the next
+     section).
+   * Verify the [data integrity proof](#data-integrity-proof) on each
+     delegation in the chain.
+   * Check that each zcap in the chain is not [expired](#expiration), that
+     each step only [attenuates](#attenuation) authority, and that the chain
+     does not exceed the maximum allowed length.
+   * Check that the invoked action is in the zcap's [allowed
+     actions](#action-allowed-action), matches the action the endpoint
+     expects, and that the request URL matches the zcap's [invocation
+     target](#target-invocation-target).
+   * Check that the key that signed the request belongs to the zcap's
+     [controller](#controller).
+6. If all of the above passes, the request is authorized. The verification
+   result includes the invoked `capability`, the `capabilityAction`, and the
+   `controller` (the invoker's DID), which the server can use for any further
+   application-level checks, logging, or auditing.
+
+### Where Does the Root zCap Come From?
+
+Recall from [Creating a Root zCap](#creating-a-root-zcap) that root zcap ids
+are deterministic: `urn:zcap:root:${encodeURIComponent(url)}`. This means the
+resource server never needs to _store_ root zcaps. Instead, it synthesizes
+them on demand during verification: given an expected target URL, the server
+constructs the root capability object itself, filling in the `controller`
+with the DID of the resource's owner (which the server knows from its own
+database -- for example, the controller of a storage space, or an admin DID
+from a config file).
+
+This is the crucial trust step: by synthesizing the root zcap, **the server
+itself decides who sits at the root of the delegation chain** for each
+resource. Everything else (delegations) is verified cryptographically from
+there.
+
+In the `@interop` / `@digitalbazaar` library stack, this synthesis is done by
+giving the verifier a document loader that handles the `urn:zcap:root:` URN
+prefix (see the code example below).
+
+### JS Example - Verifying an Incoming Request
+
+Adapted from a working server implementation
+([was-teaching-server](https://github.com/interop-alliance/was-teaching-server)):
+
+```js
+import { securityLoader } from '@interop/security-document-loader'
+import { verifyCapabilityInvocation } from '@interop/http-signature-zcap-verify'
+import { Ed25519VerificationKey } from '@interop/ed25519-verification-key'
+import { Ed25519Signature2020 } from '@interop/ed25519-signature'
+import * as didKey from '@interop/did-method-key'
+
+// Set up a did:key resolver, used to dereference the invocation's signing key
+const didKeyDriver = didKey.driver()
+didKeyDriver.use({
+  multibaseMultikeyHeader: 'z6Mk',
+  fromMultibase: Ed25519VerificationKey.from
+})
+
+/**
+ * Verifies the capability invocation on an incoming HTTP request.
+ *
+ * @param options {object}
+ * @param options.url {string}   full request URL
+ * @param options.method {string}   HTTP method of the request
+ * @param options.headers {object}   request headers (including `authorization`,
+ *   `capability-invocation`, and `digest`)
+ * @param options.allowedTarget {string}   the expected invocationTarget URL
+ * @param options.allowedAction {string}   the expected action, e.g. 'GET'
+ * @param options.resourceController {string}   DID of the resource owner; this
+ *   becomes the controller of the synthesized root zcap
+ * @returns {Promise<object>}   `{ verified, capability, capabilityAction,
+ *   controller, dereferencedChain, ... }`
+ */
+export async function verifyZcap({
+  url, method, headers, allowedTarget, allowedAction, resourceController
+}) {
+  // The server computes the expected root capability id itself
+  const expectedRootCapability = `urn:zcap:root:${encodeURIComponent(allowedTarget)}`
+
+  // Document loader that synthesizes root zcaps on demand
+  const loader = securityLoader()
+  loader.setProtocolHandler({
+    protocol: 'urn',
+    handler: {
+      get: async ({ id, url }) => {
+        const resolvedUrl = url || id
+        const rootZcapTarget = decodeURIComponent(
+          resolvedUrl.split('urn:zcap:root:')[1]
+        )
+        return {
+          '@context': 'https://w3id.org/zcap/v1',
+          id: resolvedUrl,
+          invocationTarget: rootZcapTarget,
+          // This is the trust anchor: the server decides who the root
+          // controller is for this resource
+          controller: resourceController
+        }
+      }
+    }
+  })
+  const documentLoader = loader.build()
+
+  return verifyCapabilityInvocation({
+    url, method, headers,
+    expectedHost: new URL(allowedTarget).host,
+    expectedAction: allowedAction,
+    expectedRootCapability,
+    expectedTarget: allowedTarget,
+    documentLoader,
+    // Resolves the invocation signature's keyId to a verifier
+    async getVerifier({ keyId }) {
+      const verificationMethod = await didKeyDriver.get({ url: keyId })
+      const key = await Ed25519VerificationKey.from(verificationMethod)
+      return { verifier: key.verifier(), verificationMethod }
+    },
+    suite: new Ed25519Signature2020()
+  })
+}
+```
+
+The result object looks like:
+
+```js
+{
+  verified: true,
+  capability,           // the invoked zcap
+  capabilityAction,     // the action that was invoked, e.g. 'GET'
+  controller,           // DID of the invoker
+  invoker: controller,
+  dereferencedChain,    // the full zcap chain, root first
+  verificationMethod
+}
+```
+
+A typical HTTP handler then becomes:
+
+```js
+const result = await verifyZcap({
+  url, method, headers,
+  allowedTarget: 'https://example.com/documents/123',
+  allowedAction: method,  // e.g. require the action to match the HTTP verb
+  resourceController: documentOwnerDid
+})
+if (!result.verified) {
+  return response.status(401).end()
+}
+// ... proceed with the request
+```
+
+### What the Verification Library Does *Not* Check
+
+A few things remain the resource server's responsibility, beyond the
+`verifyCapabilityInvocation()` call:
+
+* **The request body hash.** The HTTP signature covers the `Digest` _header_,
+  but the library never sees the request body -- the server must independently
+  compute the hash of the received body and compare it against the `Digest`
+  header value. Skipping this check allows an attacker to replay a signed
+  request with a different payload. See [Verifying the `Digest`
+  Header](#verifying-the-digest-header) below.
+* **[Revocation](#revocation).** The library accepts an optional
+  `inspectCapabilityChain` callback; use it to check each zcap id in the chain
+  against your revocation list. (See also [Revoking zCaps](#revoking-zcaps).)
+* **Application-level authorization.** A verified invocation proves the
+  requester holds a valid, unexpired zcap chain for this target and action --
+  any business rules beyond that (rate limits, quotas, per-tenant logic) are
+  up to the server, using the returned `controller` and `capability`.
+
+Useful optional knobs on `verifyCapabilityInvocation()`:
+
+* `allowTargetAttenuation` - allow delegated zcaps to narrow the invocation
+  target to a sub-path of the parent's URL (hierarchical RESTful attenuation;
+  see [attenuation](#attenuation)). Most storage use cases (EDV, WAS) need
+  this enabled.
+* `maxChainLength` - maximum number of delegations allowed in a chain.
+* `maxDelegationTtl` - maximum time-to-live of any delegated zcap in the
+  chain (measured as the difference between the delegation proof's `created`
+  and the zcap's `expires`).
+* `maxClockSkew` - seconds of clock skew tolerated when checking signature
+  and capability expiration times (default: 300).
+
+### Verifying the `Digest` Header
+
+This is the server-side counterpart of [Constructing the `Digest`
+Header](#constructing-the-digest-header), and only applies to requests that
+have a body (PUT, POST, etc).
+
+The procedure: hash the request body with SHA-256, encode the hash the same
+way the client did (the encoding is indicated by the header value's prefix --
+`SHA-256=` for base64, `mh=` for Multihash), and compare against the received
+`Digest` header value.
+
+Two things to watch out for:
+
+* Hash the **raw received body bytes**, not a re-serialized version of the
+  parsed body. A `JSON.parse()` / `JSON.stringify()` round trip is not
+  guaranteed to reproduce the exact bytes the client hashed.
+* If the endpoint accepts a body, treat a _missing_ `Digest` header as an
+  error, too -- otherwise an attacker can strip the header along with swapping
+  the body.
+
+Javascript example, using the `@interop/http-digest-header` package (which
+handles both encodings automatically):
+
+```js
+import { verifyHeaderValue } from '@interop/http-digest-header'
+
+// In your HTTP handler, alongside the zcap verification:
+if (requestHasBody) {
+  const digestHeader = headers.digest
+  if (!digestHeader) {
+    return response.status(400).end()
+  }
+  const { verified } = await verifyHeaderValue({
+    data: rawBody, headerValue: digestHeader
+  })
+  if (!verified) {
+    return response.status(400).end()
+  }
+}
+```
 
 ## Performance Considerations
 
