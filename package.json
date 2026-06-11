@@ -1,7 +1,7 @@
 {
   "name": "zcap-developer-guide",
   "version": "0.0.0",
-  "description": "[![CC BY-NC-SA 4.0][cc-by-nc-sa-shield]][cc-by-nc-sa]",
+  "description": "zCap (Authorization Capabilities) Developer's Guide",
   "homepage": "https://github.com/gobengo/zcap-developer-guide#readme",
   "bugs": {
     "url": "https://github.com/gobengo/zcap-developer-guide/issues"
@@ -10,7 +10,7 @@
     "type": "git",
     "url": "git+https://github.com/gobengo/zcap-developer-guide.git"
   },
-  "license": "UNLICENSED",
+  "license": "CC BY-NC-SA 4.0",
   "author": "",
   "type": "module",
   "main": "README.md",

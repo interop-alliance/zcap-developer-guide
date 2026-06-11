@@ -129,12 +129,37 @@ or cloud microservice, capable of generating or storing cryptographic material
 prove cryptographic control over its identifier.
 
 #### attenuation
+A restriction placed on a zcap during [delegation](#delegation), narrowing what
+the new zcap is allowed to do compared to its parent. For example: a shorter
+list of [allowed actions](#action-allowed-action), an earlier
+[expiration](#expiration), or a more specific [invocation
+target](#target-invocation-target) (such as a sub-path of the parent's target
+URL). Also known as a "caveat" in the object capability literature.
+
+A key security property of zcaps is that delegation can only ever _narrow_
+authority, never expand it -- a delegated zcap cannot allow more actions or a
+broader target than its parent.
+
+Note that current zCap deployments express attenuation implicitly (by
+delegating a narrower URL path or a smaller list of actions), rather than
+through an explicit `caveat` property; see [Limitations and Future
+Work](#limitations-and-future-work).
 
 #### Authorization header
 An HTTP header typically used to carry request authorizations.
 See [Constructing the Authorization Header](#constructing-the-authorization-header).
 
 #### capability chain, proof chain
+The list of zcaps connecting a [delegated](#delegation) zcap back to its
+[root zcap](#root-zcap), serialized as the `capabilityChain` array inside the
+zcap's `proof` property. Each zcap in the chain is signed by the
+[controller](#controller) of its parent, which allows a [resource
+server](#resource-server-rs) to verify the whole chain of authority, starting
+from the root, and to check that each delegation step only
+[attenuated](#attenuation) (never expanded) the authority of its parent.
+
+See the example delegated zcap in the [Delegating a zCap](#delegating-a-zcap)
+section, which shows a `capabilityChain` containing the root zcap's id.
 
 #### caveat
 See [attenuation](#attenuation).
@@ -150,6 +175,20 @@ See the [Verifiable Credential Data Integrity 1.0](https://www.w3.org/TR/vc-data
 specification for more details.
 
 #### delegation
+The act of granting another [agent](#agent) some (or all) of the authority
+contained in an existing zcap. Delegation works by creating a new zcap that:
+
+1. names the receiving agent's DID as its [controller](#controller),
+2. points at the zcap it was derived from via the `parentCapability` property,
+   and
+3. is signed by the delegating agent, using a [data integrity
+   proof](#data-integrity-proof) with the `capabilityDelegation` proof purpose.
+
+The resulting zcap can be [attenuated](#attenuation) (restricted to fewer
+actions, a narrower target, or an earlier expiration), and can itself be
+further delegated, forming a [capability chain](#capability-chain-proof-chain).
+
+See [Delegating a zCap](#delegating-a-zcap) for a code example.
 
 #### Digest header
 An HTTP header containing a digest hash of the request body.
@@ -209,9 +248,20 @@ zcap.
 See [Creating a Root zCap](#creating-a-root-zcap)
 
 #### signer
+An abstract handle to a signature function -- an object with an `id` (the
+verification method, usually a DID with a key fragment) and an async `sign()`
+method. Using signers (instead of raw private [keys](#key-cryptographic-key))
+allows the actual key material to live elsewhere, such as in an HSM (Hardware
+Security Module) or a remote KMS.
+
 See [Creating a did:key Signer Instance](https://github.com/digitalcredentials/wallet-attached-storage#creating-a-didkey-signer-instance)
 
 #### target, invocation target
+The resource that a zcap's [allowed actions](#action-allowed-action) apply to,
+specified in the zcap's `invocationTarget` property. This is usually a URL --
+an API endpoint for REST/RPC use cases, or an individual object (a document,
+collection, or file) for storage use cases -- hosted on a [resource
+server](#resource-server-rs).
 
 #### zcap
 
@@ -534,8 +584,6 @@ The `signature` parameter is base64 encoded (RFC 4648, standard alphabet, PADDED
 ## Performance Considerations
 
 ### Caching zCaps by `id` for Verification
-
-## Case Studies
 
 ### Using zCaps with Encrypted Data Vaults (EDVs)
 
