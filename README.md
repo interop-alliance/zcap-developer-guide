@@ -8,33 +8,33 @@ Report issues to this guide's repo: https://github.com/interop-alliance/zcap-dev
 
 ## Table of Contents
 
-* [Motivation](#motivation)
-* [Introduction](#introduction)
+- [Motivation](#motivation)
+- [Introduction](#introduction)
   - [When to Use zCaps (and When Not To)](#when-to-use-zcaps-and-when-not-to)
   - [Limitations and Future Work](#limitations-and-future-work)
-* [Terminology](#terminology)
-* [zCap Lifecycle](#zcap-lifecycle)
+- [Terminology](#terminology)
+- [zCap Lifecycle](#zcap-lifecycle)
   - [Creating and Delegating zCaps](#creating-and-delegating-zcaps)
   - [Requesting zCaps](#requesting-zcaps)
   - [Revoking zCaps](#revoking-zcaps)
-* [Using zCaps with HTTP Requests](#using-zcaps-with-http-requests)
-* [Verifying zCaps on the Resource Server](#verifying-zcaps-on-the-resource-server)
+- [Using zCaps with HTTP Requests](#using-zcaps-with-http-requests)
+- [Verifying zCaps on the Resource Server](#verifying-zcaps-on-the-resource-server)
   - [Verification Algorithm Overview](#verification-algorithm-overview)
   - [Where Does the Root zCap Come From?](#where-does-the-root-zcap-come-from)
   - [JS Example - Verifying an Incoming Request](#js-example---verifying-an-incoming-request)
-  - [What the Verification Library Does *Not* Check](#what-the-verification-library-does-not-check)
+  - [What the Verification Library Does _Not_ Check](#what-the-verification-library-does-not-check)
   - [Verifying the `Digest` Header](#verifying-the-digest-header)
-* [Performance Considerations](#performance-considerations)
+- [Performance Considerations](#performance-considerations)
   - [Caching zCaps by `id` for Verification](#caching-zcaps-by-id-for-verification)
-* [Case Studies](#case-studies)
+- [Case Studies](#case-studies)
   - [Using zCaps with Encrypted Data Vaults (EDVs)](#using-zcaps-with-encrypted-data-vaults-edvs)
   - [Using zCaps with Wallet Attached Storage (WAS)](#using-zcaps-with-wallet-attached-storage-was)
-* [Appendix A: IANA Registration Considerations](#appendix-a-iana-registration-considerations)
-* [Appendix B: Implementations](#appendix-b-implementations)
-* [Appendix C: FAQ](#appendix-c-faq)
+- [Appendix A: IANA Registration Considerations](#appendix-a-iana-registration-considerations)
+- [Appendix B: Implementations](#appendix-b-implementations)
+- [Appendix C: FAQ](#appendix-c-faq)
   - [Why not OAuth 2](#why-not-oauth-2)
   - [What About JSON-LD / Linked Data?](#what-about-json-ld--linked-data)
-* [License](#license)
+- [License](#license)
 
 ## Motivation
 
@@ -55,9 +55,9 @@ way of chaining proofs together for purposes of delegation.
 
 They are incredibly useful for advanced authorization use cases such as for:
 
-* API microservice ecosystems (REST- or RPC-based) with complex permission models
-* Guardrails for Agentic AI
-* Decentralized permissioned storage systems such as [Encrypted Data
+- API microservice ecosystems (REST- or RPC-based) with complex permission models
+- Guardrails for Agentic AI
+- Decentralized permissioned storage systems such as [Encrypted Data
   Vaults](https://identity.foundation/edv-spec/) and [Wallet Attached
   Storage](https://github.com/digitalcredentials/wallet-attached-storage-spec/)
 
@@ -66,11 +66,11 @@ What do we mean by "structured access tokens"? Basically, they're JSON objects
 with the following properties, which roughly answer the question of "who can
 perform what actions with a given resource, given these restrictions":
 
-* **who** - which [agent](#agent) (identified by a cryptographic key or
+- **who** - which [agent](#agent) (identified by a cryptographic key or
   [DID](#did-decentralized-identifier)) is being given permission
-* **can** - what actions is the agent allowed to perform
-* **with** - what *resource* are they allowed to perform the actions on
-* **given** - what other restrictions are in place? (these are also known as
+- **can** - what actions is the agent allowed to perform
+- **with** - what _resource_ are they allowed to perform the actions on
+- **given** - what other restrictions are in place? (these are also known as
   "caveats" or "attenuations")
 
 Here is a (simplified) example zcap (given in Javascript notation just so we can
@@ -115,9 +115,9 @@ private keys).
 
 ### Limitations and Future Work
 
-* Currently, a zCap is limited to one invocationTarget.
-  * Needs to be: multiple invocationTarget-action combinations
-* No caveat notation currently used (or rather, implicit attenuation via URL suffixes)
+- Currently, a zCap is limited to one invocationTarget.
+  - Needs to be: multiple invocationTarget-action combinations
+- No caveat notation currently used (or rather, implicit attenuation via URL suffixes)
 
 ## Terminology
 
@@ -128,12 +128,14 @@ A list of operations that the holder of the zcap is allowed to perform on the
 signature.
 
 #### agent
+
 Any entity, usually an app (mobile, desktop or web app), an AI agent,
 or cloud microservice, capable of generating or storing cryptographic material
 (at least a public/private [keypair](#key-cryptographic-key)) so that it can
 prove cryptographic control over its identifier.
 
 #### attenuation
+
 A restriction placed on a zcap during [delegation](#delegation), narrowing what
 the new zcap is allowed to do compared to its parent. For example: a shorter
 list of [allowed actions](#action-allowed-action), an earlier
@@ -151,10 +153,12 @@ through an explicit `caveat` property; see [Limitations and Future
 Work](#limitations-and-future-work).
 
 #### Authorization header
+
 An HTTP header typically used to carry request authorizations.
 See [Constructing the Authorization Header](#constructing-the-authorization-header).
 
 #### capability chain, proof chain
+
 The list of zcaps connecting a [delegated](#delegation) zcap back to its
 [root zcap](#root-zcap), serialized as the `capabilityChain` array inside the
 zcap's `proof` property. Each zcap in the chain is signed by the
@@ -167,19 +171,23 @@ See the example delegated zcap in the [Delegating a zCap](#delegating-a-zcap)
 section, which shows a `capabilityChain` containing the root zcap's id.
 
 #### caveat
+
 See [attenuation](#attenuation).
 
 #### controller
+
 The [DID](#did-decentralized-identifier) of the [agent](#agent) authorized to
 invoke a capability.
 
 #### data integrity proof
+
 A way to cryptographically sign a structured document (like a JSON object), used
 for chained delegation proofs.
 See the [Verifiable Credential Data Integrity 1.0](https://www.w3.org/TR/vc-data-integrity/)
 specification for more details.
 
 #### delegation
+
 The act of granting another [agent](#agent) some (or all) of the authority
 contained in an existing zcap. Delegation works by creating a new zcap that:
 
@@ -196,13 +204,16 @@ further delegated, forming a [capability chain](#capability-chain-proof-chain).
 See [Delegating a zCap](#delegating-a-zcap) for a code example.
 
 #### Digest header
+
 An HTTP header containing a digest hash of the request body.
 See [Constructing the Digest Header](#constructing-the-digest-header).
 
 #### DID, Decentralized Identifier
+
 See [Decentralized Identifier 1.1](https://www.w3.org/TR/did-1.1/) spec
 
 #### expiration
+
 An optional zcap property with a timestamp determining when a zcap expires.
 The timestamp is a string, in [XML-Schema dateTimeStamp](https://www.w3.org/TR/xmlschema11-2/#dateTimeStamp)
 format (web developers may be familiar with this format from the Javascript
@@ -210,13 +221,15 @@ format (web developers may be familiar with this format from the Javascript
 function).
 
 #### HTTP Signatures
+
 Refers to [RFC9421: HTTP Message Signatures](https://www.rfc-editor.org/rfc/rfc9421.html),
 a specification that details how to sign HTTP requests (headers and body).
 However, see the [Current vs Future Deployments](#current-vs-future-deployments)
 section for more discussion.
 
 #### invocation, capability invocation
-The _act_ of invoking a capability at the intended destination ([resource 
+
+The _act_ of invoking a capability at the intended destination ([resource
 server](#resource-server-rs)), a combination of _presenting_ the capability, and
 also proving cryptographic control (usually via a digital signature).
 
@@ -226,11 +239,13 @@ thus proving possession of the badge, even if not cryptographicaly) would be
 the equivalent of invoking a capability.
 
 #### key, cryptographic key
+
 Used to sign capability invocations, HTTP headers, and to generate delegation
 proofs. For zCaps specifically, this is likely to be an asymmetric key pair,
 using an appropriate elliptic curve such as `ed25519`.
 
 #### resource server, RS
+
 A server hosting a resource that's protected by an authorization capability.
 For API use cases, it's the API server itself, for storage use cases, it's
 the actual file or database server hosting the individual objects specified in
@@ -238,9 +253,11 @@ the actual file or database server hosting the individual objects specified in
 Note: The RS is ultimately responsible for verifying and enforcing zCaps.
 
 #### revocation
+
 A way to revoke (make invalid) a given zcap, after it was issued.
 
 #### root zcap
+
 Using zCaps to make authorization-carrying HTTP requests is done in one of two
 modes: either using a [root capability](#root-zcap), or using a delegated
 capability.
@@ -253,6 +270,7 @@ zcap.
 See [Creating a Root zCap](#creating-a-root-zcap)
 
 #### signer
+
 An abstract handle to a signature function -- an object with an `id` (the
 verification method, usually a DID with a key fragment) and an async `sign()`
 method. Using signers (instead of raw private [keys](#key-cryptographic-key))
@@ -262,6 +280,7 @@ Security Module) or a remote KMS.
 See [Creating a did:key Signer Instance](https://github.com/digitalcredentials/wallet-attached-storage#creating-a-didkey-signer-instance)
 
 #### target, invocation target
+
 The resource that a zcap's [allowed actions](#action-allowed-action) apply to,
 specified in the zcap's `invocationTarget` property. This is usually a URL --
 an API endpoint for REST/RPC use cases, or an individual object (a document,
@@ -301,23 +320,23 @@ that it's intended for, and the DID of the controller:
 
 ```js
 const ROOT_ZCAP_TEMPLATE = {
-  '@context': [
-    'https://w3id.org/zcap/v1',
+  "@context": [
+    "https://w3id.org/zcap/v1",
     // Assumes you're using an ed25519 based DID; substitute as appropriate
-    'https://w3id.org/security/suites/ed25519-2020/v1'
+    "https://w3id.org/security/suites/ed25519-2020/v1",
   ],
-  id: 'urn:zcap:root:...',
-  controller: 'did:...',
-  invocationTarget: 'https://example.com/api/endpoint'
+  id: "urn:zcap:root:...",
+  controller: "did:...",
+  invocationTarget: "https://example.com/api/endpoint",
 };
 
-const url = 'https://example.com/api/endpoint';
-const did = 'did:key:z6MknBxrctS4KsfiBsEaXsfnrnfNYTvDjVpLYYUAN6PX2EfG';
+const url = "https://example.com/api/endpoint";
+const did = "did:key:z6MknBxrctS4KsfiBsEaXsfnrnfNYTvDjVpLYYUAN6PX2EfG";
 const rootCapability = {
   ...ROOT_ZCAP_TEMPLATE,
   id: `urn:zcap:root:${encodeURIComponent(url)}`,
   controller: did,
-  invocationTarget: url
+  invocationTarget: url,
 };
 ```
 
@@ -326,7 +345,8 @@ Example root zcap:
 ```json
 {
   "@context": [
-    "https://w3id.org/zcap/v1", "https://w3id.org/security/suites/ed25519-2020/v1"
+    "https://w3id.org/zcap/v1",
+    "https://w3id.org/security/suites/ed25519-2020/v1"
   ],
   "id": "urn:zcap:root:https%3A%2F%2Fexample.com%2Fapi",
   "controller": "did:key:z6Mkfeco2NSEPeFV3DkjNSabaCza1EoS3CmqLb1eJ5BriiaR",
@@ -337,25 +357,28 @@ Example root zcap:
 #### Delegating a zCap
 
 ```js
-import { Ed25519Signature2020 } from '@digitalcredentials/ed25519-signature-2020';
-import { ZcapClient } from '@digitalcredentials/ezcap';
+import { Ed25519Signature2020 } from "@digitalcredentials/ed25519-signature-2020";
+import { ZcapClient } from "@digitalcredentials/ezcap";
 
 const zcapClient = new ZcapClient({
   delegationSigner: capabilityDelegationKey.signer(),
-  SuiteClass: Ed25519Signature2020
+  SuiteClass: Ed25519Signature2020,
 });
 
-const allowedActions = ['GET']
+const allowedActions = ["GET"];
 // DID identifying the entity to delegate to.
-const delegatee = 'did:key:...';
+const delegatee = "did:key:...";
 
-const url = 'https://example.com/api/endpoint';
+const url = "https://example.com/api/endpoint";
 
 // Pass in the zcap to delegate - either the original root zcap or its descendant
 const capability = rootZcap;
 
 const delegatedCapability = await zcapClient.delegate({
-  url, capability, targetDelegate: delegatee, allowedActions
+  url,
+  capability,
+  targetDelegate: delegatee,
+  allowedActions,
 });
 ```
 
@@ -364,7 +387,8 @@ Example delegated zcap:
 ```json
 {
   "@context": [
-    "https://w3id.org/zcap/v1", "https://w3id.org/security/suites/ed25519-2020/v1"
+    "https://w3id.org/zcap/v1",
+    "https://w3id.org/security/suites/ed25519-2020/v1"
   ],
   "id": "urn:zcap:delegated:z9gLKoFmKHwhxCzmo91Ywnh",
   "parentCapability": "urn:zcap:root:https%3A%2F%2Fexample.com%2Fdocuments",
@@ -377,9 +401,7 @@ Example delegated zcap:
     "created": "2021-11-28T20:53:06Z",
     "verificationMethod": "did:key:z6Mkfeco2NSEPeFV3DkjNSabaCza1EoS3CmqLb1eJ5BriiaR#z6Mkfeco2NSEPeFV3DkjNSabaCza1EoS3CmqLb1eJ5BriiaR",
     "proofPurpose": "capabilityDelegation",
-    "capabilityChain": [
-      "urn:zcap:root:https%3A%2F%2Fexample.com%2Fdocuments"
-    ],
+    "capabilityChain": ["urn:zcap:root:https%3A%2F%2Fexample.com%2Fdocuments"],
     "proofValue": "z244yxzRuFMyGfK85QcE6UewEZ3JpGDDTCvBKuxNiwdnxF3AmsSAoVYTBPLvFpYV7SeeWB4tUBGMGTF7pka6xR3av"
   }
 }
@@ -390,14 +412,14 @@ Example delegated zcap:
 How does an agent request a zCap? (From the [resource server](#resource-server-rs)'s
 controller or similar appropriate entity.)
 
-* For many use cases, zCaps do not need to be dynamically requested. Instead,
+- For many use cases, zCaps do not need to be dynamically requested. Instead,
   they are created/delegated at service provisioning time, and the resulting
   zCap in a config file (environment variable or your secrets management
   infrastructure)
-* For user-facing workflows, consider using VC-API in combination with the
+- For user-facing workflows, consider using VC-API in combination with the
   [Authorization Capability Request](https://w3c-ccg.github.io/vp-request-spec/#authorization-capability-request)
-  query from the VPR spec. 
-* Other workflows and protocols, such as the [Grant Negotiation and Authorization
+  query from the VPR spec.
+- Other workflows and protocols, such as the [Grant Negotiation and Authorization
   Protocol (GNAP)](https://datatracker.ietf.org/doc/rfc9635/) can also be used
   to request zCaps.
 
@@ -405,32 +427,34 @@ Example zCap request:
 
 ```json
 {
-    "verifiablePresentationRequest": {
-      "interact": {
-        "type": "UnmediatedHttpPresentationService2021",
-        "serviceEndpoint": "https://example.com/exchanges/tx/12345"
-      },
-      "query": [
-        {
-          "type": "ZcapQuery",
-          "capabilityQuery": {
-            "reason":
-              "Example App is requesting the permission to read and write to the Verifiable Credentials and VC Evidence collections.",
-            "allowedAction": ["GET", "PUT", "POST"],
-            "controller": "did:example:12345",
-            "invocationTarget": 
-              { "type": "urn:was:collection", "contentType": "application/vc", "name": "VerifiableCredential collection"}
+  "verifiablePresentationRequest": {
+    "interact": {
+      "type": "UnmediatedHttpPresentationService2021",
+      "serviceEndpoint": "https://example.com/exchanges/tx/12345"
+    },
+    "query": [
+      {
+        "type": "ZcapQuery",
+        "capabilityQuery": {
+          "reason": "Example App is requesting the permission to read and write to the Verifiable Credentials and VC Evidence collections.",
+          "allowedAction": ["GET", "PUT", "POST"],
+          "controller": "did:example:12345",
+          "invocationTarget": {
+            "type": "urn:was:collection",
+            "contentType": "application/vc",
+            "name": "VerifiableCredential collection"
           }
         }
-      ]
-    }
+      }
+    ]
+  }
 }
 ```
 
 ### Revoking zCaps
 
-* Out of band
-* [Resource Server](#resource-server-rs) is responsible for handling its own
+- Out of band
+- [Resource Server](#resource-server-rs) is responsible for handling its own
   revocation API / logic
 
 ## Using zCaps with HTTP Requests
@@ -452,41 +476,49 @@ Note that to use a root zcap, the client needs to know just two things:
    Module).
 
 ```js
-import { Ed25519Signature2020 } from '@digitalcredentials/ed25519-signature-2020'
-import { ZcapClient } from '@digitalcredentials/ezcap'
+import { Ed25519Signature2020 } from "@digitalcredentials/ed25519-signature-2020";
+import { ZcapClient } from "@digitalcredentials/ezcap";
 
-const rootSigner = await loadOrConstructRootSigner()
+const rootSigner = await loadOrConstructRootSigner();
 
 // Construct a client, pass it the ability to sign requests (via invocationSigner)
 const zcapClient = new ZcapClient({
-  SuiteClass: Ed25519Signature2020, invocationSigner: rootSigner
-})
+  SuiteClass: Ed25519Signature2020,
+  invocationSigner: rootSigner,
+});
 
 // You can now perform authorization-carrying requests
-const url = 'https://example.com/api/protected-endpoint'
+const url = "https://example.com/api/protected-endpoint";
 
 const response = await zcapClient.request({
-  url, method: 'GET', action: 'GET'
-})
-console.log(response)
+  url,
+  method: "GET",
+  action: "GET",
+});
+console.log(response);
 ```
 
 When using a [delegated](#delegating-a-zcap) zcap, you will need to also include
 it in each request. Example:
 
 ```js
-const capability = await loadDelegatedCapabilityFromConfig()
-const invocationSigner = await loadSignerFromConfig()
+const capability = await loadDelegatedCapabilityFromConfig();
+const invocationSigner = await loadSignerFromConfig();
 const zcapClient = new ZcapClient({
-  SuiteClass: Ed25519Signature2020, invocationSigner
-})
+  SuiteClass: Ed25519Signature2020,
+  invocationSigner,
+});
 
 // You can also include additional custom headers
 const response = await zcapClient.request({
-  url, capability, headers,
-  method: 'POST', action: 'POST', json: { hello: "world" }
-})
-console.log(response)
+  url,
+  capability,
+  headers,
+  method: "POST",
+  action: "POST",
+  json: { hello: "world" },
+});
+console.log(response);
 ```
 
 ### Constructing an HTTP Request Algorithm Overview
@@ -504,7 +536,7 @@ a given zcap, follow this general algorithm:
    body/payload -- applicable for PUT/POST but not for GET)
 3. Assemble the pseudo-headers and headers to sign:
    `['(key-id)', '(created)', '(expires)', '(request-target)','host', 'capability-invocation']`
-    * If request has a body, add `'content-type', 'digest'` headers to the above list
+   - If request has a body, add `'content-type', 'digest'` headers to the above list
 4. Create the signature string (see below for details)
 5. Construct the `Authorization` header, add the signature and other relevant parameters
 6. Perform the HTTP request, include the `Capability-Invocation`, `Authorization`,
@@ -512,12 +544,12 @@ a given zcap, follow this general algorithm:
 
 ### Current vs Future Deployments
 
-* Current zCap deployments and implementation libraries use the `Digest` header
+- Current zCap deployments and implementation libraries use the `Digest` header
   from the [`draft-ietf-httpbis-digest-headers-05`](https://www.ietf.org/archive/id/draft-ietf-httpbis-digest-headers-05.html)
   draft spec, and use the `Authorization` header from the
   [Cavage HTTP Signatures Draft 12](https://datatracker.ietf.org/doc/html/draft-cavage-http-signatures-12)
   spec
-* Future iterations of the zCap spec and implementations are expected to migrate
+- Future iterations of the zCap spec and implementations are expected to migrate
   to use [RFC 9421: HTTP Message Signatures](https://datatracker.ietf.org/doc/html/rfc9421)
   and its corresponding `Signature-Input`, `Signature`, and `Content-Digest`
   headers instead.
@@ -538,22 +570,21 @@ action:
 
 ```js
 // base64url encoding: RFC 4648 url-safe, UNPADDED
-const encodedCapability = base64UrlEncode(gzip(JSON.stringify(capability)))
+const encodedCapability = base64UrlEncode(gzip(JSON.stringify(capability)));
 
-headers['capability-invocation'] = `zcap capability="${encodedCapability}",action="GET"`
+headers["capability-invocation"] =
+  `zcap capability="${encodedCapability}",action="GET"`;
 ```
 
 #### JS Example - `Capability-Invocation` Header
 
-
-
 ### Constructing the `Digest` Header
 
-* Only relevant/recommended if your request has a payload or request body
+- Only relevant/recommended if your request has a payload or request body
   (that is, if it's a PUT or POST request, etc)
-* See the [`draft-ietf-httpbis-digest-headers-05`](https://www.ietf.org/archive/id/draft-ietf-httpbis-digest-headers-05.html)
+- See the [`draft-ietf-httpbis-digest-headers-05`](https://www.ietf.org/archive/id/draft-ietf-httpbis-digest-headers-05.html)
   draft spec for details
-* Current deployments use either:
+- Current deployments use either:
   - the `SHA-256` hash method with base64url encoding, or
   - Multihash encoding (also using `sha256`)
 
@@ -571,7 +602,7 @@ Digest: mh=uEiBfjwT2o6iSqqu922zyc4lEk3c5YNSjJbEF_uRu70ME8Q
 
 ### Constructing the HTTP Message Signature
 
-* Current deployments still use the [Cavage HTTP Signatures Draft 12](https://datatracker.ietf.org/doc/html/draft-cavage-http-signatures-12)
+- Current deployments still use the [Cavage HTTP Signatures Draft 12](https://datatracker.ietf.org/doc/html/draft-cavage-http-signatures-12)
   spec
 
 ### Constructing the `Authorization` Header
@@ -613,7 +644,7 @@ section).
    Deployments](#current-vs-future-deployments)) and check that all the
    expected pseudo-headers and headers were covered by the signature:
    `['(key-id)', '(created)', '(expires)', '(request-target)', 'host',
-   'capability-invocation']`, plus `'content-type'` and `'digest'` if the
+'capability-invocation']`, plus `'content-type'` and `'digest'` if the
    request has a body. Check the signature's `created` and `expires`
    timestamps against the current time (allowing for some clock skew,
    typically 300 seconds).
@@ -622,26 +653,26 @@ section).
    get the public key), reconstruct the signing string, and verify the
    signature.
 4. Parse the `Capability-Invocation` header (the scheme must be `zcap`):
-   * If it contains an `id` parameter, the invoked capability is a [root
+   - If it contains an `id` parameter, the invoked capability is a [root
      zcap](#root-zcap), referenced by its `urn:zcap:root:...` id.
-   * If it contains a `capability` parameter, base64url-decode and gunzip it
+   - If it contains a `capability` parameter, base64url-decode and gunzip it
      to get the full delegated zcap. A zcap passed by value _must_ have a
      `parentCapability` (root zcaps may only be invoked by `id`).
 5. Validate the capability itself:
-   * Dereference the [capability chain](#capability-chain-proof-chain) back to
-     the root, and check that the root matches the *expected* root capability
+   - Dereference the [capability chain](#capability-chain-proof-chain) back to
+     the root, and check that the root matches the _expected_ root capability
      id for this URL (which the server computes itself -- see the next
      section).
-   * Verify the [data integrity proof](#data-integrity-proof) on each
+   - Verify the [data integrity proof](#data-integrity-proof) on each
      delegation in the chain.
-   * Check that each zcap in the chain is not [expired](#expiration), that
+   - Check that each zcap in the chain is not [expired](#expiration), that
      each step only [attenuates](#attenuation) authority, and that the chain
      does not exceed the maximum allowed length.
-   * Check that the invoked action is in the zcap's [allowed
+   - Check that the invoked action is in the zcap's [allowed
      actions](#action-allowed-action), matches the action the endpoint
      expects, and that the request URL matches the zcap's [invocation
      target](#target-invocation-target).
-   * Check that the key that signed the request belongs to the zcap's
+   - Check that the key that signed the request belongs to the zcap's
      [controller](#controller).
 6. If all of the above passes, the request is authorized. The verification
    result includes the invoked `capability`, the `capabilityAction`, and the
@@ -674,18 +705,18 @@ Adapted from a working server implementation
 ([was-teaching-server](https://github.com/interop-alliance/was-teaching-server)):
 
 ```js
-import { securityLoader } from '@interop/security-document-loader'
-import { verifyCapabilityInvocation } from '@interop/http-signature-zcap-verify'
-import { Ed25519VerificationKey } from '@interop/ed25519-verification-key'
-import { Ed25519Signature2020 } from '@interop/ed25519-signature'
-import * as didKey from '@interop/did-method-key'
+import { securityLoader } from "@interop/security-document-loader";
+import { verifyCapabilityInvocation } from "@interop/http-signature-zcap-verify";
+import { Ed25519VerificationKey } from "@interop/ed25519-verification-key";
+import { Ed25519Signature2020 } from "@interop/ed25519-signature";
+import * as didKey from "@interop/did-method-key";
 
 // Set up a did:key resolver, used to dereference the invocation's signing key
-const didKeyDriver = didKey.driver()
+const didKeyDriver = didKey.driver();
 didKeyDriver.use({
-  multibaseMultikeyHeader: 'z6Mk',
-  fromMultibase: Ed25519VerificationKey.from
-})
+  multibaseMultikeyHeader: "z6Mk",
+  fromMultibase: Ed25519VerificationKey.from,
+});
 
 /**
  * Verifies the capability invocation on an incoming HTTP request.
@@ -703,36 +734,43 @@ didKeyDriver.use({
  *   controller, dereferencedChain, ... }`
  */
 export async function verifyZcap({
-  url, method, headers, allowedTarget, allowedAction, resourceController
+  url,
+  method,
+  headers,
+  allowedTarget,
+  allowedAction,
+  resourceController,
 }) {
   // The server computes the expected root capability id itself
-  const expectedRootCapability = `urn:zcap:root:${encodeURIComponent(allowedTarget)}`
+  const expectedRootCapability = `urn:zcap:root:${encodeURIComponent(allowedTarget)}`;
 
   // Document loader that synthesizes root zcaps on demand
-  const loader = securityLoader()
+  const loader = securityLoader();
   loader.setProtocolHandler({
-    protocol: 'urn',
+    protocol: "urn",
     handler: {
       get: async ({ id, url }) => {
-        const resolvedUrl = url || id
+        const resolvedUrl = url || id;
         const rootZcapTarget = decodeURIComponent(
-          resolvedUrl.split('urn:zcap:root:')[1]
-        )
+          resolvedUrl.split("urn:zcap:root:")[1],
+        );
         return {
-          '@context': 'https://w3id.org/zcap/v1',
+          "@context": "https://w3id.org/zcap/v1",
           id: resolvedUrl,
           invocationTarget: rootZcapTarget,
           // This is the trust anchor: the server decides who the root
           // controller is for this resource
-          controller: resourceController
-        }
-      }
-    }
-  })
-  const documentLoader = loader.build()
+          controller: resourceController,
+        };
+      },
+    },
+  });
+  const documentLoader = loader.build();
 
   return verifyCapabilityInvocation({
-    url, method, headers,
+    url,
+    method,
+    headers,
     expectedHost: new URL(allowedTarget).host,
     expectedAction: allowedAction,
     expectedRootCapability,
@@ -740,12 +778,12 @@ export async function verifyZcap({
     documentLoader,
     // Resolves the invocation signature's keyId to a verifier
     async getVerifier({ keyId }) {
-      const verificationMethod = await didKeyDriver.get({ url: keyId })
-      const key = await Ed25519VerificationKey.from(verificationMethod)
-      return { verifier: key.verifier(), verificationMethod }
+      const verificationMethod = await didKeyDriver.get({ url: keyId });
+      const key = await Ed25519VerificationKey.from(verificationMethod);
+      return { verifier: key.verifier(), verificationMethod };
     },
-    suite: new Ed25519Signature2020()
-  })
+    suite: new Ed25519Signature2020(),
+  });
 }
 ```
 
@@ -767,47 +805,49 @@ A typical HTTP handler then becomes:
 
 ```js
 const result = await verifyZcap({
-  url, method, headers,
-  allowedTarget: 'https://example.com/documents/123',
-  allowedAction: method,  // e.g. require the action to match the HTTP verb
-  resourceController: documentOwnerDid
-})
+  url,
+  method,
+  headers,
+  allowedTarget: "https://example.com/documents/123",
+  allowedAction: method, // e.g. require the action to match the HTTP verb
+  resourceController: documentOwnerDid,
+});
 if (!result.verified) {
-  return response.status(401).end()
+  return response.status(401).end();
 }
 // ... proceed with the request
 ```
 
-### What the Verification Library Does *Not* Check
+### What the Verification Library Does _Not_ Check
 
 A few things remain the resource server's responsibility, beyond the
 `verifyCapabilityInvocation()` call:
 
-* **The request body hash.** The HTTP signature covers the `Digest` _header_,
+- **The request body hash.** The HTTP signature covers the `Digest` _header_,
   but the library never sees the request body -- the server must independently
   compute the hash of the received body and compare it against the `Digest`
   header value. Skipping this check allows an attacker to replay a signed
   request with a different payload. See [Verifying the `Digest`
   Header](#verifying-the-digest-header) below.
-* **[Revocation](#revocation).** The library accepts an optional
+- **[Revocation](#revocation).** The library accepts an optional
   `inspectCapabilityChain` callback; use it to check each zcap id in the chain
   against your revocation list. (See also [Revoking zCaps](#revoking-zcaps).)
-* **Application-level authorization.** A verified invocation proves the
+- **Application-level authorization.** A verified invocation proves the
   requester holds a valid, unexpired zcap chain for this target and action --
   any business rules beyond that (rate limits, quotas, per-tenant logic) are
   up to the server, using the returned `controller` and `capability`.
 
 Useful optional knobs on `verifyCapabilityInvocation()`:
 
-* `allowTargetAttenuation` - allow delegated zcaps to narrow the invocation
+- `allowTargetAttenuation` - allow delegated zcaps to narrow the invocation
   target to a sub-path of the parent's URL (hierarchical RESTful attenuation;
   see [attenuation](#attenuation)). Most storage use cases (EDV, WAS) need
   this enabled.
-* `maxChainLength` - maximum number of delegations allowed in a chain.
-* `maxDelegationTtl` - maximum time-to-live of any delegated zcap in the
+- `maxChainLength` - maximum number of delegations allowed in a chain.
+- `maxDelegationTtl` - maximum time-to-live of any delegated zcap in the
   chain (measured as the difference between the delegation proof's `created`
   and the zcap's `expires`).
-* `maxClockSkew` - seconds of clock skew tolerated when checking signature
+- `maxClockSkew` - seconds of clock skew tolerated when checking signature
   and capability expiration times (default: 300).
 
 ### Verifying the `Digest` Header
@@ -823,10 +863,10 @@ way the client did (the encoding is indicated by the header value's prefix --
 
 Two things to watch out for:
 
-* Hash the **raw received body bytes**, not a re-serialized version of the
+- Hash the **raw received body bytes**, not a re-serialized version of the
   parsed body. A `JSON.parse()` / `JSON.stringify()` round trip is not
   guaranteed to reproduce the exact bytes the client hashed.
-* If the endpoint accepts a body, treat a _missing_ `Digest` header as an
+- If the endpoint accepts a body, treat a _missing_ `Digest` header as an
   error, too -- otherwise an attacker can strip the header along with swapping
   the body.
 
@@ -834,19 +874,20 @@ Javascript example, using the `@interop/http-digest-header` package (which
 handles both encodings automatically):
 
 ```js
-import { verifyHeaderValue } from '@interop/http-digest-header'
+import { verifyHeaderValue } from "@interop/http-digest-header";
 
 // In your HTTP handler, alongside the zcap verification:
 if (requestHasBody) {
-  const digestHeader = headers.digest
+  const digestHeader = headers.digest;
   if (!digestHeader) {
-    return response.status(400).end()
+    return response.status(400).end();
   }
   const { verified } = await verifyHeaderValue({
-    data: rawBody, headerValue: digestHeader
-  })
+    data: rawBody,
+    headerValue: digestHeader,
+  });
   if (!verified) {
-    return response.status(400).end()
+    return response.status(400).end();
   }
 }
 ```
@@ -863,6 +904,8 @@ if (requestHasBody) {
 
 ## Appendix B: Implementations
 
+- [zcap-dotnet](https://github.com/moisesja/zcap-dotnet). Currently being leveraged by [OpaqAI](https://www.opaq.ai). Soon to be moved to OpaqAI's repository.
+
 ## Appendix C: FAQ
 
 ### Why Not OAuth 2
@@ -874,19 +917,19 @@ is this better than OAuth 2?".
 
 ### What About JSON-LD / Linked Data?
 
-* The current spec version, [Authorization Capabilities for Linked Data v0.3](https://w3c-ccg.github.io/zcap-spec/),
+- The current spec version, [Authorization Capabilities for Linked Data v0.3](https://w3c-ccg.github.io/zcap-spec/),
   uses JSON-LD serializations for zCaps, primarily for the convenience of
   using various Data Integrity cryptosuites for proof chains.
-* However, now that the W3C Verifiable Credentials Working Group has released
+- However, now that the W3C Verifiable Credentials Working Group has released
   specs that don't require linked data canonicalization (such as the
   [`eddsa-jcs-2022`](https://w3c.github.io/vc-di-eddsa/#eddsa-jcs-2022) suite),
   proof chains can be done without the use of `@context` or JSON-LD.
-* (From conversations with the zCap spec editors) The next version of the zCap
+- (From conversations with the zCap spec editors) The next version of the zCap
   spec is going to drop the `@context` requirement, and use either JCS-based
   signature methods, or perhaps specify a _default context_.
 
-
 ## License
+
 This work is licensed under a
 [Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International License][cc-by-nc-sa].
 
