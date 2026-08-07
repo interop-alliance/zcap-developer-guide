@@ -6,6 +6,8 @@
 
 Report issues to this guide's repo: https://github.com/interop-alliance/zcap-developer-guide
 
+Contributions are welcome -- see [CONTRIBUTING.md](./CONTRIBUTING.md).
+
 ## Table of Contents
 
 * [Motivation](#motivation)
@@ -112,6 +114,80 @@ zcaps could not be reused/replayed (as long as the original app did not leak its
 private keys).
 
 ### When to Use zCaps (and When Not To)
+
+zCaps are not a drop-in replacement for every authorization mechanism. They
+earn their (real) complexity when delegation, decentralization, or proof of
+possession are actual requirements of your system -- and they are the wrong
+tool when a session cookie or a plain bearer token already does the job.
+
+**Reach for zCaps when:**
+
+* **Delegation is a first-class requirement.** This is the headline feature.
+  If authority in your system naturally flows through chains -- a user grants
+  an app, the app grants a backend service, the service grants a short-lived
+  worker or AI agent -- zCaps model this directly. Each hop can
+  [attenuate](#attenuation) (narrow) the authority it passes on, the
+  "delegation can only narrow, never expand" rule is enforced
+  cryptographically rather than by policy code, and delegation happens
+  *offline*: no round trip to a central authorization server to mint the new
+  token.
+* **There is no central authorization server (and you don't want one).**
+  Verification is self-contained: the [resource server](#resource-server-rs)
+  synthesizes the [root zcap](#root-zcap) itself and verifies the delegation
+  chain cryptographically -- no token introspection endpoint, no shared
+  session store. This is why zCaps fit decentralized and multi-tenant storage
+  (EDV, WAS), where each user controls their own resources and the server
+  merely enforces, rather than owns, the permission model.
+* **Bearer tokens fail your threat model.** Every zCap invocation is signed
+  with the invoker's key (proof of possession, as with
+  [DPoP](https://datatracker.ietf.org/doc/html/rfc9449)). A zcap leaked
+  through a log file, a proxy, or a stolen header grants an attacker nothing
+  without the corresponding private key.
+* **You want to eliminate ambient authority.** Services that act on behalf of
+  many principals (microservice meshes, AI agents) are classic [confused
+  deputy](https://en.wikipedia.org/wiki/Confused_deputy_problem) victims: they
+  get tricked into using their *own* broad privileges on an attacker's behalf.
+  With zCaps, the authority travels with the request and names the exact
+  resource and action -- the deputy has no ambient privileges to confuse.
+* **Your resources are URL-shaped and hierarchical.** The
+  `invocationTarget` model (plus target attenuation onto sub-paths) maps
+  naturally onto REST APIs and document/collection storage. This is why
+  storage systems are the current sweet spot -- see the
+  [case studies](#case-studies).
+
+**Prefer something simpler when:**
+
+* **You just need login and roles for your own app.** If "is this user signed
+  in, and are they an admin?" describes your authorization model, sessions or
+  OpenID Connect are simpler, better tooled, and already understood by your
+  team. zCaps pay off only once delegation or decentralization enters the
+  picture.
+* **Your clients can't manage keys.** Every invoker needs a keypair and must
+  sign every request. Third-party webhooks, `curl`-with-an-API-key
+  integrations, and legacy clients can't do that -- bearer tokens exist
+  precisely because they demand nothing of the client.
+* **You need off-the-shelf ecosystem maturity.** OAuth 2 has audited
+  libraries in every language, hosted providers, and decades of operational
+  lore. The zCap stack is currently JavaScript-centric, and (see
+  [Current vs Future Deployments](#current-vs-future-deployments)) still
+  rests on draft-era HTTP signature specs. If you can't absorb that maturity
+  level, wait.
+* **You need instant, centralized revocation or dynamic policy.** Revocation
+  is each resource server's own responsibility, out of band (see
+  [Revoking zCaps](#revoking-zcaps)). If your compliance posture demands
+  "disable this user everywhere, from one console, within seconds," or your
+  decisions depend on runtime context (risk scores, time-of-day rules), a
+  centralized policy server fits better. With zCaps, the standard mitigation
+  is short [expiration](#expiration) windows.
+* **You actually need authentication, not authorization.** A zcap says what a
+  *key* may do; it deliberately says nothing about who a *person* is. For
+  identity, attributes, and claims, use OpenID Connect or Verifiable
+  Credentials -- possibly alongside zCaps, which is a feature, not a gap.
+
+These choices also compose: it's common to authenticate users with OIDC or
+VCs, *request* zCaps via a protocol like [GNAP](#requesting-zcaps), and then
+use zCaps for the machine-to-machine authorization underneath. For a more
+direct comparison with OAuth 2, see the [FAQ](#why-not-oauth-2).
 
 ### Limitations and Future Work
 
@@ -419,7 +495,7 @@ Example zCap request:
             "allowedAction": ["GET", "PUT", "POST"],
             "controller": "did:example:12345",
             "invocationTarget": 
-              { "type": "urn:was:collection", "contentType": "application/vc", "name": "VerifiableCredential collection"}
+              { "type": "https://w3id.org/byoe#collection", "contentType": "application/vc", "name": "VerifiableCredential collection"}
           }
         }
       ]
@@ -854,6 +930,8 @@ if (requestHasBody) {
 ## Performance Considerations
 
 ### Caching zCaps by `id` for Verification
+
+## Case Studies
 
 ### Using zCaps with Encrypted Data Vaults (EDVs)
 
